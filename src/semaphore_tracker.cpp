@@ -24,6 +24,7 @@
 #include "device.h"
 #include "cdl.h"
 #include "logger.h"
+#include "marker.h"
 
 namespace crash_diagnostic_layer {
 
@@ -39,8 +40,8 @@ void SemaphoreTracker::SemaphoreInfo::UpdateLastModifier(Device& device, Semapho
 }
 
 // TODO https://github.com/LunarG/CrashDiagnosticLayer/issues/70 track_semaphores_last_setter_ is broken
-SemaphoreTracker::SemaphoreTracker(Device& device)
-    : device_(device), markers_(device), track_semaphores_last_setter_(false) {}
+SemaphoreTracker::SemaphoreTracker(Device& device, std::unique_ptr<BufferMarkerMgr> buffer_marker_mgr)
+    : device_(device), markers_(std::move(buffer_marker_mgr)), track_semaphores_last_setter_(false) {}
 
 const Logger& SemaphoreTracker::Log() const { return device_.Log(); }
 
@@ -52,7 +53,7 @@ void SemaphoreTracker::RegisterSemaphore(VkSemaphore vk_semaphore, VkSemaphoreTy
     // Create a new semaphore info and add it to the semaphores container
     SemaphoreInfo semaphore_info = {};
     semaphore_info.semaphore_type = type;
-    semaphore_info.marker = markers_.Allocate(uint64_t(0));
+    semaphore_info.marker = markers_->Allocate(uint64_t(0));
     //  Reserve a marker to track semaphore value
     if (!semaphore_info.marker) {
         device_.Log().Error("Cannot acquire marker. Not tracking semaphore %s.",
@@ -60,8 +61,8 @@ void SemaphoreTracker::RegisterSemaphore(VkSemaphore vk_semaphore, VkSemaphoreTy
         return;
     }
     if (track_semaphores_last_setter_) {
-        semaphore_info.last_type = markers_.Allocate(uint32_t(0));
-        semaphore_info.last_id = markers_.Allocate(uint32_t(0));
+        semaphore_info.last_type = markers_->Allocate(uint32_t(0));
+        semaphore_info.last_id = markers_->Allocate(uint32_t(0));
         if (!semaphore_info.last_type || !semaphore_info.last_id) {
             device_.Log().Error("Cannot acquire modifier tracking marker. Not tracking semaphore %s.",
                                 device_.GetObjectName((uint64_t)vk_semaphore).c_str());

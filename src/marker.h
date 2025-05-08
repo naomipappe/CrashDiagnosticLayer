@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <limits>
 
@@ -44,15 +45,29 @@ class Marker {
     Marker(BufferMarkerMgr &mgr, MarkerDataPtr &&data, uint32_t initial_value);
     Marker(Marker &) = delete;
     Marker &operator=(Marker &) = delete;
-    ~Marker();
+    virtual ~Marker();
 
-    void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value);
+    virtual void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) = 0;
     void Write(uint32_t value);
     uint32_t Read() const;
 
-   private:
+   protected:
     BufferMarkerMgr &mgr_;
     MarkerDataPtr data_;
+};
+
+class MarkerCore : public Marker {
+   public:
+    MarkerCore(BufferMarkerMgr &mgr, MarkerDataPtr &&data, uint32_t initial_value);
+    virtual ~MarkerCore() = default;
+    virtual void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) override;
+};
+
+class MarkerAMD : public Marker {
+   public:
+    MarkerAMD(BufferMarkerMgr &mgr, MarkerDataPtr &&data, uint32_t initial_value);
+    virtual ~MarkerAMD() = default;
+    virtual void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) override;
 };
 
 class Marker64 {
@@ -62,15 +77,30 @@ class Marker64 {
     Marker64(BufferMarkerMgr &mgr, MarkerDataPtr &&data, uint64_t initial_value);
     Marker64(Marker64 &) = delete;
     Marker64 &operator=(Marker64 &) = delete;
-    ~Marker64();
+    virtual ~Marker64();
 
-    void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value);
+    virtual void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) = 0;
     void Write(uint64_t value);
     uint64_t Read() const;
 
-   private:
+   protected:
     BufferMarkerMgr &mgr_;
     MarkerDataPtr data_;
+};
+
+class MarkerCore64 : public Marker64 {
+   public:
+    MarkerCore64(BufferMarkerMgr &mgr, MarkerDataPtr &&data, uint64_t initial_value);
+    virtual ~MarkerCore64() = default;
+    virtual void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) override;
+};
+
+class MarkerAMD64 : public Marker64 {
+   public:
+    MarkerAMD64(BufferMarkerMgr &mgr, MarkerDataPtr &&data, uint64_t initial_value);
+
+    virtual ~MarkerAMD64() = default;
+    virtual void Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) override;
 };
 
 class BufferMarkerMgr {
@@ -78,19 +108,19 @@ class BufferMarkerMgr {
     BufferMarkerMgr(Device &);
     BufferMarkerMgr(BufferMarkerMgr &) = delete;
     BufferMarkerMgr &operator=(BufferMarkerMgr &) = delete;
-    ~BufferMarkerMgr();
+    virtual ~BufferMarkerMgr();
 
-    std::unique_ptr<Marker> Allocate(uint32_t initial_value = 0);
+    virtual std::unique_ptr<Marker> Allocate(uint32_t initial_value = 0) = 0;
     void Free(Marker &);
 
-    std::unique_ptr<Marker64> Allocate(uint64_t initial_value = 0);
+    virtual std::unique_ptr<Marker64> Allocate(uint64_t initial_value = 0) = 0;
     void Free(Marker64 &);
 
     const DeviceDispatchTable &Dispatch();
 
-   private:
+   protected:
     static constexpr VkDeviceSize kBufferMarkerBufferSize = kBufferMarkerEventCount * sizeof(uint32_t);
-    static constexpr VkDeviceSize kBuffermarkerHeapSize = 64 * 1024 * 1024;
+    static constexpr VkDeviceSize kBufferMarkerHeapSize = 64 * 1024 * 1024;
 
     VkResult AcquireMarkerBuffer();
     VkResult CreateHostBuffer(VkDeviceSize buffer_size, VkBuffer *p_buffer, VkDeviceSize heap_offset);
@@ -120,6 +150,22 @@ class BufferMarkerMgr {
     void *marker_buffers_heap_mapped_base_{nullptr};
     VkDeviceSize current_heap_offset_{0};
     VkPhysicalDeviceMemoryProperties memory_properties_{};
+};
+
+class BufferMarkerCoreMgr : public BufferMarkerMgr {
+   public:
+    BufferMarkerCoreMgr(Device &);
+    virtual ~BufferMarkerCoreMgr() = default;
+    virtual std::unique_ptr<Marker> Allocate(uint32_t initial_value = 0) override;
+    virtual std::unique_ptr<Marker64> Allocate(uint64_t initial_value = 0) override;
+};
+
+class BufferMarkerAMDMgr : public BufferMarkerMgr {
+   public:
+    BufferMarkerAMDMgr(Device &);
+    virtual ~BufferMarkerAMDMgr() = default;
+    virtual std::unique_ptr<Marker> Allocate(uint32_t initial_value = 0) override;
+    virtual std::unique_ptr<Marker64> Allocate(uint64_t initial_value = 0) override;
 };
 
 };  // namespace crash_diagnostic_layer

@@ -17,6 +17,7 @@
 #include "checkpoint.h"
 #include "device.h"
 #include "logger.h"
+#include "marker.h"
 
 #include <cassert>
 #include <vulkan/utility/vk_struct_helper.hpp>
@@ -41,13 +42,14 @@ uint32_t Checkpoint::ReadBottom() const { return mgr_->ReadBottom(*this); }
 
 void Checkpoint::Reset() { mgr_->Reset(*this); }
 
-BufferMarkerCheckpointMgr::BufferMarkerCheckpointMgr(Device &device) : markers_(device) {}
+BufferMarkerCheckpointMgr::BufferMarkerCheckpointMgr(std::unique_ptr<BufferMarkerMgr> buffer_marker_manager)
+    : markers_(std::move(buffer_marker_manager)) {}
 
 std::unique_ptr<Checkpoint> BufferMarkerCheckpointMgr::Allocate(uint32_t initial_value) {
     auto checkpoint = std::make_unique<Checkpoint>(this, next_id_++);
     Data data;
-    data.top_marker = markers_.Allocate(initial_value);
-    data.bottom_marker = markers_.Allocate(initial_value);
+    data.top_marker = markers_->Allocate(initial_value);
+    data.bottom_marker = markers_->Allocate(initial_value);
     if (!data.top_marker || !data.bottom_marker) {
         return nullptr;
     }
