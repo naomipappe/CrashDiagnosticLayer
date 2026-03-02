@@ -520,8 +520,8 @@ const VkDeviceCreateInfo* Context::GetModifiedDeviceCreateInfo(VkPhysicalDevice 
     }
     if (!extensions_present.nv_device_diagnostic_checkpoints && !extensions_present.amd_buffer_marker) {
         Log().Warning(
-            "No device support for VK_NV_device_diagnostic_checkpoints or VK_AMD_buffer_marker extension, progression tracking will be "
-            "disabled.");
+            "No VK_NV_device_diagnostic_checkpoints or VK_AMD_buffer_marker extension, progression tracking would use "
+            "less reliant approach");
     }
     if (extensions_present.ext_device_fault) {
         if (!extensions_enabled.ext_device_fault) {

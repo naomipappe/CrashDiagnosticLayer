@@ -64,7 +64,7 @@ struct TrackedSemaphoreInfo {
 
 class SemaphoreTracker {
    public:
-    SemaphoreTracker(Device& device);
+    SemaphoreTracker(Device& device, std::unique_ptr<BufferMarkerMgr> buffer_marker_mgr);
     SemaphoreTracker(SemaphoreTracker&) = delete;
     SemaphoreTracker& operator=(SemaphoreTracker&) = delete;
 
@@ -91,7 +91,7 @@ class SemaphoreTracker {
 
    private:
     Device& device_;
-    BufferMarkerMgr markers_;
+    std::unique_ptr<BufferMarkerMgr> markers_;
     bool track_semaphores_last_setter_ = false;
 
     struct SemaphoreInfo {

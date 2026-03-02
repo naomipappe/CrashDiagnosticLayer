@@ -16,6 +16,7 @@
 */
 
 #include "marker.h"
+#include <cstdint>
 #include "cdl.h"
 #include "device.h"
 #include "dispatch.h"
@@ -74,7 +75,7 @@ VkResult BufferMarkerMgr::CreateHostBuffer(VkDeviceSize buffer_size, VkBuffer* p
 
     assert(p_buffer != nullptr);
     buffer_size = std::max<VkDeviceSize>(buffer_size, 256);
-    if (heap_offset + buffer_size >= kBuffermarkerHeapSize) {
+    if (heap_offset + buffer_size >= kBufferMarkerHeapSize) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -122,7 +123,7 @@ VkResult BufferMarkerMgr::CreateHostBuffer(VkDeviceSize buffer_size, VkBuffer* p
         VkMemoryAllocateInfo alloc_info = {};
         alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         alloc_info.pNext = nullptr;
-        alloc_info.allocationSize = kBuffermarkerHeapSize;
+        alloc_info.allocationSize = kBufferMarkerHeapSize;
         alloc_info.memoryTypeIndex = memory_type_index;
         vk_res = dt.AllocateMemory(device, &alloc_info, nullptr, &marker_buffers_heap_);
         assert(VK_SUCCESS == vk_res);
@@ -159,7 +160,7 @@ VkResult BufferMarkerMgr::AcquireMarkerBuffer() {
     VkDevice device = device_.GetVkDevice();
     if (marker_buffers_heap_mapped_base_ == nullptr) {
         vk_res =
-            dt.MapMemory(device, marker_buffers_heap_, 0, kBuffermarkerHeapSize, 0, &marker_buffers_heap_mapped_base_);
+            dt.MapMemory(device, marker_buffers_heap_, 0, kBufferMarkerHeapSize, 0, &marker_buffers_heap_mapped_base_);
         assert(VK_SUCCESS == vk_res);
         if (vk_res != VK_SUCCESS) {
             dt.FreeMemory(device, marker_buffers_heap_, nullptr);
@@ -201,38 +202,74 @@ MarkerDataPtr BufferMarkerMgr::AllocateData(uint32_t num_words) {
     return data;
 }
 
-std::unique_ptr<Marker> BufferMarkerMgr::Allocate(uint32_t initial_value) {
+std::unique_ptr<Marker> BufferMarkerCoreMgr::Allocate(uint32_t initial_value) {
     std::unique_ptr<Marker> marker;
     // If there is a recycled marker, use it.
     {
         std::lock_guard<std::mutex> lock(recycled_markers_u32_mutex_);
         if (recycled_markers_u32_.size() > 0) {
-            marker = std::make_unique<Marker>(*this, std::move(recycled_markers_u32_.back()), initial_value);
+            marker = std::make_unique<MarkerCore>(*this, std::move(recycled_markers_u32_.back()), initial_value);
             recycled_markers_u32_.pop_back();
             return marker;
         }
     }
     auto data = AllocateData(1);
     if (data) {
-        marker = std::make_unique<Marker>(*this, std::move(data), initial_value);
+        marker = std::make_unique<MarkerCore>(*this, std::move(data), initial_value);
     }
     return marker;
 }
 
-std::unique_ptr<Marker64> BufferMarkerMgr::Allocate(uint64_t initial_value) {
+std::unique_ptr<Marker64> BufferMarkerCoreMgr::Allocate(uint64_t initial_value) {
     std::unique_ptr<Marker64> marker;
     // If there is a recycled marker, use it.
     {
         std::lock_guard<std::mutex> lock(recycled_markers_u64_mutex_);
         if (recycled_markers_u64_.size() > 0) {
-            marker = std::make_unique<Marker64>(*this, std::move(recycled_markers_u64_.back()), initial_value);
+            marker = std::make_unique<MarkerCore64>(*this, std::move(recycled_markers_u64_.back()), initial_value);
             recycled_markers_u64_.pop_back();
             return marker;
         }
     }
     auto data = AllocateData(2);
     if (data) {
-        marker = std::make_unique<Marker64>(*this, std::move(data), initial_value);
+        marker = std::make_unique<MarkerCore64>(*this, std::move(data), initial_value);
+    }
+    return marker;
+}
+
+std::unique_ptr<Marker> BufferMarkerAMDMgr::Allocate(uint32_t initial_value) {
+    std::unique_ptr<Marker> marker;
+    // If there is a recycled marker, use it.
+    {
+        std::lock_guard<std::mutex> lock(recycled_markers_u32_mutex_);
+        if (recycled_markers_u32_.size() > 0) {
+            marker = std::make_unique<MarkerAMD>(*this, std::move(recycled_markers_u32_.back()), initial_value);
+            recycled_markers_u32_.pop_back();
+            return marker;
+        }
+    }
+    auto data = AllocateData(1);
+    if (data) {
+        marker = std::make_unique<MarkerAMD>(*this, std::move(data), initial_value);
+    }
+    return marker;
+}
+
+std::unique_ptr<Marker64> BufferMarkerAMDMgr::Allocate(uint64_t initial_value) {
+    std::unique_ptr<Marker64> marker;
+    // If there is a recycled marker, use it.
+    {
+        std::lock_guard<std::mutex> lock(recycled_markers_u64_mutex_);
+        if (recycled_markers_u64_.size() > 0) {
+            marker = std::make_unique<MarkerAMD64>(*this, std::move(recycled_markers_u64_.back()), initial_value);
+            recycled_markers_u64_.pop_back();
+            return marker;
+        }
+    }
+    auto data = AllocateData(2);
+    if (data) {
+        marker = std::make_unique<MarkerAMD64>(*this, std::move(data), initial_value);
     }
     return marker;
 }
@@ -259,7 +296,20 @@ Marker::Marker(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint32_t initial_valu
 
 Marker::~Marker() { mgr_.Free(*this); }
 
-void Marker::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) {
+MarkerCore::MarkerCore(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint32_t initial_value)
+    : Marker(mgr, std::move(data), initial_value) {}
+
+void MarkerCore::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) {
+    mgr_.Dispatch().CmdUpdateBuffer(cmd, data_->buffer, data_->offset, sizeof(uint32_t), &value);
+    mgr_.Dispatch().CmdPipelineBarrier(cmd, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                       VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
+                                       nullptr, 0, nullptr);
+}
+
+MarkerAMD::MarkerAMD(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint32_t initial_value)
+    : Marker(mgr, std::move(data), initial_value) {}
+
+void MarkerAMD::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) {
     mgr_.Dispatch().CmdWriteBufferMarkerAMD(cmd, stage, data_->buffer, data_->offset, value);
 }
 
@@ -274,7 +324,23 @@ Marker64::Marker64(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint64_t initial_
 
 Marker64::~Marker64() { mgr_.Free(*this); }
 
-void Marker64::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) {
+MarkerCore64::MarkerCore64(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint64_t initial_value)
+    : Marker64(mgr, std::move(data), initial_value) {}
+
+void MarkerCore64::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) {
+    uint32_t u32_value = value & 0xffffffff;
+    mgr_.Dispatch().CmdUpdateBuffer(cmd, data_->buffer, data_->offset, sizeof(uint32_t), &u32_value);
+    u32_value = value >> 32;
+    mgr_.Dispatch().CmdUpdateBuffer(cmd, data_->buffer, data_->offset + sizeof(uint32_t), sizeof(uint32_t), &u32_value);
+    mgr_.Dispatch().CmdPipelineBarrier(cmd, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                       VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
+                                       nullptr, 0, nullptr);
+}
+
+MarkerAMD64::MarkerAMD64(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint64_t initial_value)
+    : Marker64(mgr, std::move(data), initial_value) {}
+
+void MarkerAMD64::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) {
     uint32_t u32_value = value & 0xffffffff;
     mgr_.Dispatch().CmdWriteBufferMarkerAMD(cmd, stage, data_->buffer, data_->offset, u32_value);
     u32_value = value >> 32;
@@ -285,4 +351,6 @@ void Marker64::Write(uint64_t value) { *(uint64_t*)data_->cpu_mapped_address = v
 
 uint64_t Marker64::Read() const { return *(uint64_t*)data_->cpu_mapped_address; }
 
+BufferMarkerCoreMgr::BufferMarkerCoreMgr(Device& device) : BufferMarkerMgr(device) {}
+BufferMarkerAMDMgr::BufferMarkerAMDMgr(Device& device) : BufferMarkerMgr(device) {}
 }  // namespace crash_diagnostic_layer

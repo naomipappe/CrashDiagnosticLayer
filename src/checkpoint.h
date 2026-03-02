@@ -17,6 +17,7 @@
 #pragma once
 
 #include "marker.h"
+#include <memory>
 #include <mutex>
 
 namespace crash_diagnostic_layer {
@@ -60,7 +61,7 @@ class CheckpointMgr {
 
 class BufferMarkerCheckpointMgr : public CheckpointMgr {
    public:
-    BufferMarkerCheckpointMgr(Device &device);
+    BufferMarkerCheckpointMgr(std::unique_ptr<BufferMarkerMgr> buffer_marker_manager);
     BufferMarkerCheckpointMgr(BufferMarkerCheckpointMgr &) = delete;
     BufferMarkerCheckpointMgr &operator=(BufferMarkerCheckpointMgr &) = delete;
 
@@ -78,7 +79,7 @@ class BufferMarkerCheckpointMgr : public CheckpointMgr {
         std::unique_ptr<Marker> top_marker, bottom_marker;
     };
 
-    BufferMarkerMgr markers_;
+    std::unique_ptr<BufferMarkerMgr> markers_;
 
     mutable std::mutex checkpoint_mutex_;
     std::unordered_map<CheckpointId, Data> checkpoint_data_;

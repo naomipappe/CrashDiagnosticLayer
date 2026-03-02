@@ -21,9 +21,11 @@
 #include <cinttypes>
 #include <fstream>
 #include <iomanip>
+#include <memory>
 
 #include "cdl.h"
 #include "checkpoint.h"
+#include "marker.h"
 #include "object_name.h"
 #include "semaphore_tracker.h"
 #include "util.h"
@@ -79,11 +81,19 @@ Device::Device(Context& context, VkPhysicalDevice vk_gpu, VkDevice device, Devic
     if (extensions_present_.nv_device_diagnostic_checkpoints) {
         checkpoints_ = std::make_unique<DiagnosticCheckpointMgr>(*this);
     } else if (extensions_present_.amd_buffer_marker) {
-        checkpoints_ = std::make_unique<BufferMarkerCheckpointMgr>(*this);
+        checkpoints_ = std::make_unique<BufferMarkerCheckpointMgr>(std::make_unique<BufferMarkerAMDMgr>(*this));
+    } else {
+        Log().Warning("Using core Vulkan for progress markers, experimental");
+        checkpoints_ = std::make_unique<BufferMarkerCheckpointMgr>(std::make_unique<BufferMarkerCoreMgr>(*this));
     }
     // Create a semaphore tracker
     if (context_.GetSettings().track_semaphores) {
-        semaphore_tracker_ = std::make_unique<SemaphoreTracker>(*this);
+        if (extensions_present.amd_buffer_marker) {
+            semaphore_tracker_ = std::make_unique<SemaphoreTracker>(*this, std::make_unique<BufferMarkerAMDMgr>(*this));
+        } else {
+            semaphore_tracker_ =
+                std::make_unique<SemaphoreTracker>(*this, std::make_unique<BufferMarkerCoreMgr>(*this));
+        }
     }
     if (context_.GetSettings().trigger_watchdog_timer) {
         watchdog_.Start();
@@ -127,7 +137,12 @@ VkDevice Device::GetVkDevice() const { return vk_device_; }
 const Logger& Device::Log() const { return context_.Log(); }
 
 bool Device::HasCheckpoints() const {
-    return extensions_present_.nv_device_diagnostic_checkpoints || extensions_present_.amd_buffer_marker;
+    if (extensions_present_.nv_device_diagnostic_checkpoints || extensions_present_.amd_buffer_marker) {
+        return true;
+    } else {
+        Log().Warning("No Vendor Extension for checkpoints, using core, results may be innacurate");
+        return true;
+    }
 }
 
 void Device::FreeCommandBuffers(VkCommandPool command_pool, uint32_t command_buffer_count,
