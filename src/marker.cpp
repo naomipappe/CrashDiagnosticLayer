@@ -341,7 +341,6 @@ void MarkerCore64::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uin
                                        VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
                                        nullptr, 0, nullptr);
 }
-}
 
 MarkerAMD64::MarkerAMD64(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint64_t initial_value)
     : Marker64(mgr, std::move(data), initial_value) {}
