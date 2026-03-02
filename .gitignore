@@ -1,5 +1,6 @@
 build/
 build-android/
+build-arm64/
 external/
 .vscode/
 **/__pycache__
