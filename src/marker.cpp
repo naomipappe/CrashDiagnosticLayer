@@ -300,8 +300,10 @@ MarkerCore::MarkerCore(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint32_t init
     : Marker(mgr, std::move(data), initial_value) {}
 
 void MarkerCore::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint32_t value) {
+    mgr_.Dispatch().CmdPipelineBarrier(cmd, stage, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                                       nullptr, 0, nullptr, 0, nullptr);
     mgr_.Dispatch().CmdUpdateBuffer(cmd, data_->buffer, data_->offset, sizeof(uint32_t), &value);
-    mgr_.Dispatch().CmdPipelineBarrier(cmd, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    mgr_.Dispatch().CmdPipelineBarrier(cmd, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
                                        VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
                                        nullptr, 0, nullptr);
 }
@@ -328,13 +330,17 @@ MarkerCore64::MarkerCore64(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint64_t 
     : Marker64(mgr, std::move(data), initial_value) {}
 
 void MarkerCore64::Write(VkCommandBuffer cmd, VkPipelineStageFlagBits stage, uint64_t value) {
+    mgr_.Dispatch().CmdPipelineBarrier(cmd, stage, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                                       nullptr, 0, nullptr, 0, nullptr);
+
     uint32_t u32_value = value & 0xffffffff;
     mgr_.Dispatch().CmdUpdateBuffer(cmd, data_->buffer, data_->offset, sizeof(uint32_t), &u32_value);
     u32_value = value >> 32;
     mgr_.Dispatch().CmdUpdateBuffer(cmd, data_->buffer, data_->offset + sizeof(uint32_t), sizeof(uint32_t), &u32_value);
-    mgr_.Dispatch().CmdPipelineBarrier(cmd, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    mgr_.Dispatch().CmdPipelineBarrier(cmd, VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
                                        VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
                                        nullptr, 0, nullptr);
+}
 }
 
 MarkerAMD64::MarkerAMD64(BufferMarkerMgr& mgr, MarkerDataPtr&& data, uint64_t initial_value)
