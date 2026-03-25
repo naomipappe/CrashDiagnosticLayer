@@ -119,6 +119,10 @@ elseif(NOT CMAKE_LINKER MATCHES "lld-link")
     target_link_options(crash_diagnostic PRIVATE LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/${LAYER_NAME}.map,-Bsymbolic,--exclude-libs,ALL)
 endif()
 
+if (CDL_LINK_STATIC_LIBSTDCXX)
+    target_link_options(crash_diagnostic PRIVATE -static-libstdc++)
+endif()
+
 target_compile_options(crash_diagnostic PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/wd4100,-Wno-unused-parameter>")
 
 target_include_directories(crash_diagnostic SYSTEM PRIVATE

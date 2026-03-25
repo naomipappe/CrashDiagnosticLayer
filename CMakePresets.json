@@ -17,6 +17,34 @@
         "CDL_CODEGEN": "ON",
         "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
+    {
+      "name": "release-arm64",
+      "displayName": "arm64 Release preset",
+      "description": "Sets common release flags and arm64 toolchain",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "UPDATE_DEPS": "ON",
+        "BUILD_TESTS": "OFF",
+        "CDL_CODEGEN": "ON",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "cmake/toolchain/linux_arm64.cmake",
+        "CDL_LINK_STATIC_LIBSTDCXX": "ON"
+      }
+    },
+    {
+      "name": "debug-arm64",
+      "displayName": "arm64 Debug Preset",
+      "description": "Sets common developer flags and arm64 toolchain",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "UPDATE_DEPS": "ON",
+        "BUILD_TESTS": "OFF",
+        "CDL_CODEGEN": "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_TOOLCHAIN_FILE": "cmake/toolchain/linux_arm64.cmake",
+        "CDL_LINK_STATIC_LIBSTDCXX": "ON"
+      }
     }
   ]
 }

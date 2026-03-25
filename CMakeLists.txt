@@ -79,6 +79,7 @@ option(CDL_ENABLE_SANITIZER_LEAK      "Enable leak sanitization"      OFF)
 option(CDL_ENABLE_SANITIZER_MEMORY    "Enable memory sanitization"    OFF)
 option(CDL_ENABLE_SANITIZER_THREAD    "Enable thread sanitization"    OFF)
 option(CDL_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitization" OFF)
+option(CDL_LINK_STATIC_LIBSTDCXX      "Link the crash diagnostic layer against libstdc++ statically when supported" ON)
 
 # Now check support for each sanitizer option
 set(SUPPORTS_SANITIZE_ADDRESS FALSE)
